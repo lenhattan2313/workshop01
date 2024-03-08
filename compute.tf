@@ -10,46 +10,75 @@ resource "aws_security_group" "public_sg" {
   }
 
   ingress {
-    from_port = 80
-    to_port = 80
-    protocol = "tcp"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
   ingress {
-    from_port = 443
-    to_port = 443
-    protocol = "tcp"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
   ingress {
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
   ingress {
-    from_port = -1
-    to_port = -1
-    protocol = "icmp"
+    from_port   = -1
+    to_port     = -1
+    protocol    = "icmp"
     cidr_blocks = ["0.0.0.0/0"]
   }
   egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "alb_sg" {
+  name        = "alb_sg"
+  description = "Allow http, https inbound traffic and all outbound traffic"
+  vpc_id      = aws_vpc.vpc.id
+
+  tags = {
+    Name = "public_sg"
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
 //2. create 2 EC2 public subnet
 resource "aws_instance" "public_ec2" {
-  count = length(aws_subnet.public_subnet)
-  ami = var.ami 
-  instance_type = var.instance_type
-  key_name = "vpc-keypair"
-  subnet_id = aws_subnet.public_subnet[count.index].id
-  security_groups = [aws_security_group.public_sg.id]
-  associate_public_ip_address = true  # Ensure instance gets a public IP
+  count                       = length(aws_subnet.public_subnet)
+  ami                         = var.ami
+  instance_type               = var.instance_type
+  key_name                    = "vpc-keypair"
+  subnet_id                   = aws_subnet.public_subnet[count.index].id
+  vpc_security_group_ids      = [aws_security_group.public_sg.id]
+  associate_public_ip_address = true # Ensure instance gets a public IP
   tags = {
     Name = "EC2_Public ${count.index + 1}"
   }
@@ -64,7 +93,7 @@ resource "aws_instance" "public_ec2" {
               chmod 2775 /usr/share/nqinx/html
               echo "<h1>Web Server - ${count.index + 1}</h1>" > /usr/share/nginx/html/index.html
               EOF
-  
+
 }
 
 #3. create target group of application load balancer
@@ -77,7 +106,7 @@ resource "aws_lb_target_group" "alb_target_group" {
 }
 
 resource "aws_lb_target_group_attachment" "alb_target_group_attachment" {
-  count            = length(aws_instance.public_ec2) 
+  count            = length(aws_instance.public_ec2)
   target_group_arn = aws_lb_target_group.alb_target_group.arn
   target_id        = aws_instance.public_ec2[count.index].id
 
@@ -89,7 +118,7 @@ resource "aws_lb" "alb" {
   name               = "alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.public_sg.id] //using the same sg with ec2
+  security_groups    = [aws_security_group.alb_sg.id] 
   subnets            = [for subnet in aws_subnet.public_subnet : subnet.id]
 
   # enable_deletion_protection = true
@@ -116,7 +145,7 @@ resource "aws_lb_listener" "alb_listener_http" {
   protocol          = "HTTP"
 
   default_action {
-    type             = "redirect"
+    type = "redirect"
     redirect {
       port        = "443"
       protocol    = "HTTPS"
@@ -124,3 +153,4 @@ resource "aws_lb_listener" "alb_listener_http" {
     }
   }
 }
+
