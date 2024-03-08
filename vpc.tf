@@ -83,7 +83,6 @@ data "aws_iam_policy_document" "policy_document" {
       "logs:PutLogEvents",
       "logs:DescribeLogGroups",
       "logs:DescribeLogStreams",
-      "iam:CreateRole",
     ]
 
     resources = ["*"]
